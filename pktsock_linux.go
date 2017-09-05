@@ -3,6 +3,7 @@ package dhcp4client
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"io"
 	"net"
 	"time"
 
@@ -24,12 +25,13 @@ var (
 )
 
 // abstracts AF_PACKET
-type packetSock struct {
-	fd      int
-	ifindex int
+type PacketSock struct {
+	fd       int
+	ifindex  int
+	randFunc func(p []byte) (n int, err error)
 }
 
-func NewPacketSock(ifindex int) (*packetSock, error) {
+func NewPacketSock(ifindex int, options ...func(*PacketSock) error) (*PacketSock, error) {
 	fd, err := unix.Socket(unix.AF_PACKET, unix.SOCK_DGRAM, int(swap16(unix.ETH_P_IP)))
 	if err != nil {
 		return nil, err
@@ -44,19 +46,43 @@ func NewPacketSock(ifindex int) (*packetSock, error) {
 		return nil, err
 	}
 
-	return &packetSock{
-		fd:      fd,
-		ifindex: ifindex,
-	}, nil
+	ps := &PacketSock{
+		fd:       fd,
+		ifindex:  ifindex,
+		randFunc: rand.Read,
+	}
+
+	err := ps.SetOption(options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return ps, nil
 }
 
-func (pc *packetSock) Close() error {
-	return unix.Close(pc.fd)
+func (ps *PacketSock) SetOption(options ...func(*PacketSock) error) error {
+	for _, opt := range options {
+		if err := opt(ps); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (pc *packetSock) Write(packet []byte) error {
+func RandFunc(f io.Reader) func(*PacketSock) error {
+	return func(ps *PacketSock) error {
+		ps.rand = f
+		return nil
+	}
+}
+
+func (ps *PacketSock) Close() error {
+	return unix.Close(ps.fd)
+}
+
+func (ps *PacketSock) Write(packet []byte) error {
 	lladdr := unix.SockaddrLinklayer{
-		Ifindex:  pc.ifindex,
+		Ifindex:  ps.ifindex,
 		Protocol: swap16(unix.ETH_P_IP),
 		Halen:    uint8(len(bcastMAC)),
 	}
@@ -64,16 +90,21 @@ func (pc *packetSock) Write(packet []byte) error {
 
 	pkt := make([]byte, minIPHdrLen+udpHdrLen+len(packet))
 
+	// Generate the Packet Identifier
+	if _, err := ps.randFunc(pkt[4:5]); err != nil {
+		return err
+	}
+
 	fillIPHdr(pkt[0:minIPHdrLen], udpHdrLen+uint16(len(packet)))
 	fillUDPHdr(pkt[minIPHdrLen:minIPHdrLen+udpHdrLen], uint16(len(packet)))
 
 	// payload
 	copy(pkt[minIPHdrLen+udpHdrLen:len(pkt)], packet)
 
-	return unix.Sendto(pc.fd, pkt, 0, &lladdr)
+	return unix.Sendto(ps.fd, pkt, 0, &lladdr)
 }
 
-func (pc *packetSock) ReadFrom() ([]byte, net.IP, error) {
+func (pc *PacketSock) ReadFrom() ([]byte, net.IP, error) {
 	pkt := make([]byte, maxIPHdrLen+udpHdrLen+MaxDHCPLen)
 	n, _, err := unix.Recvfrom(pc.fd, pkt, 0)
 	if err != nil {
@@ -88,7 +119,7 @@ func (pc *packetSock) ReadFrom() ([]byte, net.IP, error) {
 	return pkt[ihl+udpHdrLen : n], src, nil
 }
 
-func (pc *packetSock) SetReadTimeout(t time.Duration) error {
+func (pc *PacketSock) SetReadTimeout(t time.Duration) error {
 
 	tv := unix.NsecToTimeval(t.Nanoseconds())
 	return unix.SetsockoptTimeval(pc.fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv)
@@ -112,15 +143,13 @@ func chksum(p []byte, csum []byte) {
 	csum[1] = uint8(s >> 8)
 }
 
+//Hdr must be passed with the identification already populated.
 func fillIPHdr(hdr []byte, payloadLen uint16) {
 	// version + IHL
 	hdr[0] = ip4Ver | (minIPHdrLen / 4)
 	// total length
 	binary.BigEndian.PutUint16(hdr[2:4], uint16(len(hdr))+payloadLen)
-	// identification
-	if _, err := rand.Read(hdr[4:5]); err != nil {
-		panic(err)
-	}
+	//Identification (hdr[4:5]) should already be populated prior to this function.
 	// TTL
 	hdr[8] = 16
 	// Protocol
