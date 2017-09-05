@@ -52,7 +52,7 @@ func NewPacketSock(ifindex int, options ...func(*PacketSock) error) (*PacketSock
 		randFunc: rand.Read,
 	}
 
-	err := ps.SetOption(options...)
+	err = ps.SetOption(options...)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (ps *PacketSock) SetOption(options ...func(*PacketSock) error) error {
 
 func RandFunc(f io.Reader) func(*PacketSock) error {
 	return func(ps *PacketSock) error {
-		ps.rand = f
+		ps.randFunc = f
 		return nil
 	}
 }
