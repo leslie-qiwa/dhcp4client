@@ -3,7 +3,6 @@ package dhcp4client
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"io"
 	"net"
 	"time"
 
@@ -69,7 +68,7 @@ func (ps *PacketSock) SetOption(options ...func(*PacketSock) error) error {
 	return nil
 }
 
-func RandFunc(f io.Reader) func(*PacketSock) error {
+func RandFunc(f func(p []byte) (n int, err error)) func(*PacketSock) error {
 	return func(ps *PacketSock) error {
 		ps.randFunc = f
 		return nil
