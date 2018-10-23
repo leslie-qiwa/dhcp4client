@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/d2g/dhcp4"
+	"github.com/krolaw/dhcp4"
 )
 
 const (

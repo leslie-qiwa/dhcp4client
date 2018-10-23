@@ -1,11 +1,9 @@
-package dhcp4client_test
+package dhcp4client
 
 import (
 	"log"
 	"net"
 	"testing"
-
-	"github.com/d2g/dhcp4client"
 )
 
 //Example Client
@@ -19,13 +17,13 @@ func Test_ExampleClient(test *testing.T) {
 
 	//Create a connection to use
 	//We need to set the connection ports to 1068 and 1067 so we don't need root access
-	c, err := dhcp4client.NewInetSock(dhcp4client.SetLocalAddr(net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 1068}), dhcp4client.SetRemoteAddr(net.UDPAddr{IP: net.IPv4bcast, Port: 1067}))
+	c, err := NewInetSock(SetLocalAddr(net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 1068}), SetRemoteAddr(net.UDPAddr{IP: net.IPv4bcast, Port: 1067}))
 	if err != nil {
 		test.Error("Client Connection Generation:" + err.Error())
 	}
 	defer c.Close()
 
-	exampleClient, err := dhcp4client.New(dhcp4client.HardwareAddr(m), dhcp4client.Connection(c))
+	exampleClient, err := New(HardwareAddr(m), Connection(c))
 	if err != nil {
 		test.Fatalf("Error:%v\n", err)
 	}
@@ -81,14 +79,14 @@ func Test_ExampleClientWithMathGenerateXID(test *testing.T) {
 
 	//Create a connection to use
 	//We need to set the connection ports to 1068 and 1067 so we don't need root access
-	c, err := dhcp4client.NewInetSock(dhcp4client.SetLocalAddr(net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 1068}), dhcp4client.SetRemoteAddr(net.UDPAddr{IP: net.IPv4bcast, Port: 1067}))
+	c, err := NewInetSock(SetLocalAddr(net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 1068}), SetRemoteAddr(net.UDPAddr{IP: net.IPv4bcast, Port: 1067}))
 	if err != nil {
 		test.Error("Client Connection Generation:" + err.Error())
 	}
 	defer c.Close()
 
 	// If you ar using MathGenerateXID then you are responsible for seeding math/rand
-	exampleClient, err := dhcp4client.New(dhcp4client.HardwareAddr(m), dhcp4client.Connection(c), dhcp4client.GenerateXID(dhcp4client.MathGenerateXID))
+	exampleClient, err := New(HardwareAddr(m), Connection(c), GenerateXID(MathGenerateXID))
 	if err != nil {
 		test.Fatalf("Error:%v\n", err)
 	}

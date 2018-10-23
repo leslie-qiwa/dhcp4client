@@ -1,13 +1,12 @@
-package dhcp4client_test
+package dhcp4client
 
 import (
 	"log"
 	"net"
-	"testing"
 	"syscall"
+	"testing"
 
-	"github.com/d2g/dhcp4"
-	"github.com/d2g/dhcp4client"
+	"github.com/krolaw/dhcp4"
 )
 
 //Example Client
@@ -20,13 +19,13 @@ func Test_ExampleLinuxClient(test *testing.T) {
 	}
 
 	//Create a connection to use
-	c, err := dhcp4client.NewPacketSock(2)
+	c, err := NewPacketSock(2, DefaultSrcPort, DefaultDstPort)
 	if err != nil {
 		test.Error("Client Connection Generation:" + err.Error())
 	}
 	defer c.Close()
 
-	exampleClient, err := dhcp4client.New(dhcp4client.HardwareAddr(m), dhcp4client.Connection(c))
+	exampleClient, err := New(HardwareAddr(m), Connection(c))
 	if err != nil {
 		test.Fatalf("Error:%v\n", err)
 	}

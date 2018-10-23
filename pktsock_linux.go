@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	minIPHdrLen = 20
-	maxIPHdrLen = 60
-	udpHdrLen   = 8
-	ip4Ver      = 0x40
-	ttl         = 16
-	srcPort     = 68
-	dstPort     = 67
+	minIPHdrLen    = 20
+	maxIPHdrLen    = 60
+	udpHdrLen      = 8
+	ip4Ver         = 0x40
+	ttl            = 16
+	DefaultSrcPort = 68
+	DefaultDstPort = 67
 )
 
 var (
@@ -27,9 +27,11 @@ var (
 type packetSock struct {
 	fd      int
 	ifindex int
+	srcPort uint16
+	dstPort uint16
 }
 
-func NewPacketSock(ifindex int) (*packetSock, error) {
+func NewPacketSock(ifindex int, srcPort, dstPort uint16) (*packetSock, error) {
 	fd, err := unix.Socket(unix.AF_PACKET, unix.SOCK_DGRAM, int(swap16(unix.ETH_P_IP)))
 	if err != nil {
 		return nil, err
@@ -47,6 +49,8 @@ func NewPacketSock(ifindex int) (*packetSock, error) {
 	return &packetSock{
 		fd:      fd,
 		ifindex: ifindex,
+		srcPort: srcPort,
+		dstPort: dstPort,
 	}, nil
 }
 
@@ -65,7 +69,7 @@ func (pc *packetSock) Write(packet []byte) error {
 	pkt := make([]byte, minIPHdrLen+udpHdrLen+len(packet))
 
 	fillIPHdr(pkt[0:minIPHdrLen], udpHdrLen+uint16(len(packet)))
-	fillUDPHdr(pkt[minIPHdrLen:minIPHdrLen+udpHdrLen], uint16(len(packet)))
+	fillUDPHdr(pkt[minIPHdrLen:minIPHdrLen+udpHdrLen], uint16(len(packet)), pc.srcPort, pc.dstPort)
 
 	// payload
 	copy(pkt[minIPHdrLen+udpHdrLen:len(pkt)], packet)
@@ -131,7 +135,7 @@ func fillIPHdr(hdr []byte, payloadLen uint16) {
 	chksum(hdr[0:len(hdr)], hdr[10:12])
 }
 
-func fillUDPHdr(hdr []byte, payloadLen uint16) {
+func fillUDPHdr(hdr []byte, payloadLen, srcPort, dstPort uint16) {
 	// src port
 	binary.BigEndian.PutUint16(hdr[0:2], srcPort)
 	// dest port
